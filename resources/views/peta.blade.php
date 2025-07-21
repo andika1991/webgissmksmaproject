@@ -142,6 +142,26 @@
     <div id="hasilPrediksi"></div>
   </div>
 
+  <div id="tabelSekolah" style="position:absolute; top:10px; right:10px; width:400px; max-height:80%; overflow:auto; background:white; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); z-index:999; display:none;">
+  <h3>Daftar Sekolah</h3>
+  <table id="sekolahTable" border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:14px;">
+    <thead>
+      <tr style="background:#007cbf; color:white;">
+        <th>Nama</th>
+        <th>Alamat</th>
+        <th>Desa</th>
+        <th>Kecamatan</th>
+        <th>Guru</th>
+        <th>Siswa</th>
+        <th>Biaya/Siswa</th>
+        <th>Total Biaya Tahunan Ope</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+
   <script>
     let map;
     let sekolahData = null;
@@ -233,53 +253,73 @@ function closeStreetView() {
       });
     }
 
-    function createInfoWindowContent(lat, lng, props) {
-      return `
-        <strong style="font-size:16px; color:#007cbf;">${props.nama_sekolah}</strong><br>
-        Desa: ${props.desa}<br>
-        Kecamatan: ${props.kecamatan}<br>
-        Alamat: ${props.alamat_lengkap}<br>
-        Jumlah guru: ${props.jumlah_guru}<br>
-        Jumlah siswa: ${props.jumlah_siswa}<br>
-        <img src="${props.foto_lokal}" width="200" style="margin-top:8px;"><br>
-        <button onclick="openStreetView(${lat}, ${lng})" style="margin-top:10px; padding:6px 12px; background:#007cbf; color:white; border:none; border-radius:4px; cursor:pointer;">
-          Lihat Street View
+   function createInfoWindowContent(lat, lng, props) {
+  const biayaPerSiswa = 1500000;
+  const jumlahSiswa = parseInt(props.jumlah_siswa) || 0;
+  const totalBiaya = biayaPerSiswa * jumlahSiswa;
+
+  return `
+    <strong style="font-size:16px; color:#007cbf;">${props.nama_sekolah}</strong><br>
+    Desa: ${props.desa}<br>
+    Kecamatan: ${props.kecamatan}<br>
+    Alamat: ${props.alamat_lengkap}<br>
+    Jumlah guru: ${props.jumlah_guru}<br>
+    Jumlah siswa: ${props.jumlah_siswa}<br>
+    Biaya operasional per siswa: <strong>Rp ${biayaPerSiswa.toLocaleString('id-ID')}</strong><br>
+    Total biaya operasional sekolah/tahun: <strong>Rp ${totalBiaya.toLocaleString('id-ID')}</strong><br>
+    <img src="${props.foto_lokal}" width="200" style="margin-top:8px;"><br>
+    <button onclick="openStreetView(${lat}, ${lng})" style="margin-top:10px; padding:6px 12px; background:#007cbf; color:white; border:none; border-radius:4px; cursor:pointer;">
+      Lihat Street View
+    </button>
+    <button onclick="openGoogleMaps('${props.url_google_maps}')" style="margin-top:10px; margin-left:5px; padding:6px 12px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">
+      Lihat Detail Sekolah
+    </button>
+  `;
+}
+
+document.getElementById("kabupatenSelect").addEventListener("change", e => {
+  const selectedKab = e.target.value;
+  const jumlahDiv = document.getElementById("jumlahSekolah");
+
+  if (selectedKab === "") {
+    loadSekolahMarkers(sekolahData.features);
+    jumlahDiv.style.display = "none";
+    document.getElementById("tabelSekolah").style.display = "none";
+  } else {
+    const filtered = sekolahData.features.filter(f => f.properties.kabupaten === selectedKab);
+    loadSekolahMarkers(filtered);
+
+    let html = `
+      <div style="text-align:right;">
+        <button onclick="document.getElementById('jumlahSekolah').style.display='none'; document.getElementById('tabelSekolah').style.display='none';"
+          style="background:#e74c3c; color:#fff; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">
+          Close
         </button>
-        <button onclick="openGoogleMaps('${props.url_google_maps}')" style="margin-top:10px; margin-left:5px; padding:6px 12px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">
-          Lihat Detail Sekolah
-        </button>
-      `;
+      </div>
+      <strong>${filtered.length}</strong> sekolah SMA di <strong>${selectedKab}</strong><br><br>`;
+
+    if (filtered.length > 0) {
+      html += `<div style="max-height:200px; overflow-y:auto;">`;
+      filtered.forEach(f => {
+        html += `<div style="cursor:pointer; padding:5px; border-bottom:1px solid #ddd;"
+          onclick='flyToSekolah(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, ${JSON.stringify(f.properties)})'>
+          ${f.properties.nama_sekolah}
+        </div>`;
+      });
+      html += `</div>`;
+    } else {
+      html += "Tidak ada sekolah ditemukan.";
     }
 
-    document.getElementById("kabupatenSelect").addEventListener("change", e => {
-      const selectedKab = e.target.value;
-      const jumlahDiv = document.getElementById("jumlahSekolah");
+    jumlahDiv.innerHTML = html;
+    jumlahDiv.style.display = "block";
 
-      if (selectedKab === "") {
-        loadSekolahMarkers(sekolahData.features);
-        jumlahDiv.style.display = "none";
-      } else {
-        const filtered = sekolahData.features.filter(f => f.properties.kabupaten === selectedKab);
-        loadSekolahMarkers(filtered);
+    
+    renderTabelSekolah(filtered);
+  }
+});
 
-        let html = `<strong>${filtered.length}</strong> sekolah SMA di <strong>${selectedKab}</strong><br><br>`;
-        if (filtered.length > 0) {
-          html += `<div style="max-height:200px; overflow-y:auto;">`;
-          filtered.forEach(f => {
-            html += `<div style="cursor:pointer; padding:5px; border-bottom:1px solid #ddd;"
-              onclick='flyToSekolah(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, ${JSON.stringify(f.properties)})'>
-              ${f.properties.nama_sekolah}
-            </div>`;
-          });
-          html += `</div>`;
-        } else {
-          html += "Tidak ada sekolah ditemukan.";
-        }
 
-        jumlahDiv.innerHTML = html;
-        jumlahDiv.style.display = "block";
-      }
-    });
 
     function flyToSekolah(lat, lng, props) {
       map.setCenter({ lat, lng });
@@ -440,6 +480,55 @@ function closeStreetView() {
         alert("Link Google Maps tidak tersedia untuk sekolah ini.");
       }
     }
+
+   function renderTabelSekolah(sekolahArray) {
+  const tabelDiv = document.getElementById("tabelSekolah");
+  const tbody = tabelDiv.querySelector("tbody");
+  const thead = tabelDiv.querySelector("thead");
+
+  // Atur ulang header tabel
+  thead.innerHTML = `
+    <tr>
+      <th>Nama Sekolah</th>
+      <th>Alamat</th>
+      <th>Desa</th>
+      <th>Kecamatan</th>
+      <th>Jumlah Guru</th>
+      <th>Jumlah Siswa</th>
+      <th>Biaya Operasional</th>
+      <th>Total Biaya Operasional</th>
+    </tr>
+  `;
+
+  // Bersihkan isi sebelumnya
+  tbody.innerHTML = "";
+
+  const biayaPerSiswa = 1500000; // biaya operasional per siswa tetap
+
+  sekolahArray.forEach(f => {
+    const siswa = parseInt(f.properties.jumlah_siswa) || 0;
+    const totalBiaya = biayaPerSiswa * siswa;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${f.properties.nama_sekolah}</td>
+      <td>${f.properties.alamat_lengkap}</td>
+      <td>${f.properties.desa || '-'}</td>
+      <td>${f.properties.kecamatan || '-'}</td>
+      <td>${f.properties.jumlah_guru}</td>
+      <td>${siswa}</td>
+      <td>Rp ${biayaPerSiswa.toLocaleString("id-ID")}</td>
+      <td>Rp ${totalBiaya.toLocaleString("id-ID")}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tabelDiv.style.display = "block";
+}
+
+
+
+
 
     window.initMap = initMap;
   </script>

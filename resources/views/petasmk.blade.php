@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Web GIS SMK Lampung (Google Maps)</title>
 
-  <!-- Turf.js untuk geospasial opsional (tidak wajib jika hanya pakai Google Maps) -->
+  
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBzmvxD2iXxm-VCOO_xUQgsmufRyWBElPo&libraries=geometry&callback=initMap" async defer></script>
-  <!-- Google Maps API -->
+
   
 
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -136,6 +136,24 @@
 </div>
 
 <div id="map"></div>
+ <div id="tabelSekolah" style="position:absolute; top:10px; right:10px; width:400px; max-height:80%; overflow:auto; background:white; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); z-index:999; display:none;">
+  <h3>Daftar Sekolah</h3>
+  <table id="sekolahTable" border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:14px;">
+    <thead>
+      <tr style="background:#007cbf; color:white;">
+        <th>Nama</th>
+        <th>Alamat</th>
+        <th>Desa</th>
+        <th>Kecamatan</th>
+        <th>Guru</th>
+        <th>Siswa</th>
+        <th>Biaya/Siswa</th>
+        <th>Total Biaya Tahunan</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 
 <div class="bottom-panel">
   <button id="lokasiSayaBtn">Lokasi Saya & Prediksi Zonasi</button>
@@ -212,7 +230,13 @@ function loadSekolahMarkers(features) {
   });
 }
 
+
+
 function createInfoWindowContent(lat, lng, props) {
+  const biayaPerSiswa = 2000000;
+  const jumlahSiswa = parseInt(props.jumlah_siswa) || 0;
+  const totalBiaya = biayaPerSiswa * jumlahSiswa;
+
   return `
     <strong style="font-size:16px; color:#007cbf;">${props.nama_sekolah}</strong><br>
     Desa: ${props.desa}<br>
@@ -220,6 +244,8 @@ function createInfoWindowContent(lat, lng, props) {
     Alamat: ${props.alamat_lengkap}<br>
     Jumlah guru: ${props.jumlah_guru}<br>
     Jumlah siswa: ${props.jumlah_siswa}<br>
+    Biaya operasional per siswa: <strong>Rp ${biayaPerSiswa.toLocaleString('id-ID')}</strong><br>
+    Total biaya operasional sekolah/tahun: <strong>Rp ${totalBiaya.toLocaleString('id-ID')}</strong><br>
     <img src="${props.Foto_Lokal}" width="200" style="margin-top:8px;"><br>
     <button onclick="openStreetView(${lat}, ${lng})" style="margin-top:10px; padding:6px 12px; background:#007cbf; color:white; border:none; border-radius:4px; cursor:pointer;">
       Lihat Street View
@@ -230,6 +256,7 @@ function createInfoWindowContent(lat, lng, props) {
   `;
 }
 
+
 document.getElementById("kabupatenSelect").addEventListener("change", e => {
   const selectedKab = e.target.value;
   const jumlahDiv = document.getElementById("jumlahSekolah");
@@ -237,6 +264,7 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
   if (selectedKab === "") {
     loadSekolahMarkers(sekolahData.features);
     jumlahDiv.style.display = "none";
+    document.getElementById("tabelSekolah").style.display = "none"; // sembunyikan tabel jika semua kabupaten
   } else {
     const filtered = sekolahData.features.filter(f => f.properties.kabupaten === selectedKab);
     loadSekolahMarkers(filtered);
@@ -251,14 +279,19 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
         </div>`;
       });
       html += `</div>`;
+      
+      // Tampilkan tabel sekolah juga
+      renderTabelSekolah(filtered);
     } else {
       html += "Tidak ada sekolah ditemukan.";
+      document.getElementById("tabelSekolah").style.display = "none"; // sembunyikan tabel kalau kosong
     }
 
     jumlahDiv.innerHTML = html;
     jumlahDiv.style.display = "block";
   }
 });
+
 
 function flyToSekolah(lat, lng, props) {
   map.setCenter({ lat, lng });
@@ -419,6 +452,34 @@ function openGoogleMaps(url) {
     alert("Link Google Maps tidak tersedia untuk sekolah ini.");
   }
 }
+function renderTabelSekolah(sekolahArray) {
+  const tabelDiv = document.getElementById("tabelSekolah");
+  const tbody = tabelDiv.querySelector("tbody");
+  tbody.innerHTML = "";
+
+  const biayaPerSiswa = 2000000; // Sesuaikan dengan biaya SMK
+
+  sekolahArray.forEach(f => {
+    const siswa = parseInt(f.properties.jumlah_siswa) || 0;
+    const totalBiaya = biayaPerSiswa * siswa;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${f.properties.nama_sekolah}</td>
+      <td>${f.properties.alamat_lengkap}</td>
+      <td>${f.properties.desa || '-'}</td>
+      <td>${f.properties.kecamatan || '-'}</td>
+      <td>${f.properties.jumlah_guru}</td>
+      <td>${siswa}</td>
+      <td>Rp ${biayaPerSiswa.toLocaleString("id-ID")}</td>
+      <td>Rp ${totalBiaya.toLocaleString("id-ID")}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tabelDiv.style.display = "block";
+}
+
 
 window.initMap = initMap;
 </script>
