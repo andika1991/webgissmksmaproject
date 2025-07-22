@@ -106,6 +106,9 @@
       margin-bottom: 10px;
       cursor: pointer;
     }
+
+
+    
   </style>
 </head>
 <body>
@@ -142,13 +145,12 @@
     <div id="hasilPrediksi"></div>
   </div>
 
-  <div id="tabelSekolah" style="position:absolute; top:10px; right:10px; width:400px; max-height:80%; overflow:auto; background:white; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); z-index:999; display:none;">
+  <div id="tabelSekolah" style="position:absolute; top:10px; right:30px; width:500px; max-height:80%; overflow:auto; background:white; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); z-index:999; display:none;">
   <h3>Daftar Sekolah</h3>
   <table id="sekolahTable" border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:14px;">
     <thead>
       <tr style="background:#007cbf; color:white;">
         <th>Nama</th>
-        <th>Alamat</th>
         <th>Desa</th>
         <th>Kecamatan</th>
         <th>Guru</th>
@@ -156,6 +158,7 @@
         <th>Biaya/Siswa</th>
         <th>Total Biaya Tahunan Ope</th>
       </tr>
+      
     </thead>
     <tbody></tbody>
   </table>
@@ -252,30 +255,54 @@ function closeStreetView() {
         markers.push(marker);
       });
     }
+  
 
-   function createInfoWindowContent(lat, lng, props) {
+function createInfoWindowContent(lat, lng, props) {
   const biayaPerSiswa = 1500000;
   const jumlahSiswa = parseInt(props.jumlah_siswa) || 0;
   const totalBiaya = biayaPerSiswa * jumlahSiswa;
 
   return `
-    <strong style="font-size:16px; color:#007cbf;">${props.nama_sekolah}</strong><br>
-    Desa: ${props.desa}<br>
-    Kecamatan: ${props.kecamatan}<br>
-    Alamat: ${props.alamat_lengkap}<br>
-    Jumlah guru: ${props.jumlah_guru}<br>
-    Jumlah siswa: ${props.jumlah_siswa}<br>
-    Biaya operasional per siswa: <strong>Rp ${biayaPerSiswa.toLocaleString('id-ID')}</strong><br>
-    Total biaya operasional sekolah/tahun: <strong>Rp ${totalBiaya.toLocaleString('id-ID')}</strong><br>
-    <img src="${props.foto_lokal}" width="200" style="margin-top:8px;"><br>
-    <button onclick="openStreetView(${lat}, ${lng})" style="margin-top:10px; padding:6px 12px; background:#007cbf; color:white; border:none; border-radius:4px; cursor:pointer;">
-      Lihat Street View
-    </button>
-    <button onclick="openGoogleMaps('${props.url_google_maps}')" style="margin-top:10px; margin-left:5px; padding:6px 12px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">
-      Lihat Detail Sekolah
-    </button>
+    <div style="font-family: Arial, sans-serif; font-size: 13px; max-width: 260px;">
+      <div style="font-weight: bold; color: #007cbf; margin-bottom: 5px;">
+        ${props.nama_sekolah}
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        <strong>Alamat:</strong><br>
+        ${props.alamat_lengkap}
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        👨‍🏫 <strong>Guru:</strong> ${props.jumlah_guru} <br>
+        👨‍🎓 <strong>Siswa:</strong> ${props.jumlah_siswa}
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        💰 <strong>Biaya perSiswa:</strong> Rp ${biayaPerSiswa.toLocaleString('id-ID')}<br>
+        💸 <strong>Total Oprasional perTahun:</strong> Rp ${totalBiaya.toLocaleString('id-ID')}
+      </div>
+
+      <img src="${props.foto_lokal}" alt="Foto Sekolah"
+        style="width: 100%; height: 80px; object-fit: cover; border-radius: 4px; margin-bottom: 6px;" />
+
+      <div style="display: flex; gap: 6px;">
+        <button onclick="openStreetView(${lat}, ${lng})"
+          style="flex:1; background:#007cbf; color:white; border:none; padding:6px; font-size:12px; border-radius:4px; cursor:pointer;">
+          Street View
+        </button>
+
+        <button onclick="openGoogleMaps('${props.url_google_maps}')"
+          style="flex:1; background:#28a745; color:white; border:none; padding:6px; font-size:12px; border-radius:4px; cursor:pointer;">
+          Detail
+        </button>
+      </div>
+    </div>
   `;
 }
+
+
+
 
 document.getElementById("kabupatenSelect").addEventListener("change", e => {
   const selectedKab = e.target.value;
@@ -321,17 +348,32 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
 
 
 
-    function flyToSekolah(lat, lng, props) {
-      map.setCenter({ lat, lng });
-      map.setZoom(15);
+   let currentInfoWindow = null; 
 
-      const infoWindow = new google.maps.InfoWindow({
-        content: createInfoWindowContent(lat, lng, props),
-        position: { lat, lng }
-      });
+function flyToSekolah(lat, lng, props) {
+  
+  map.setCenter({ lat, lng });
+  map.setZoom(15);
 
-      infoWindow.open(map);
-    }
+  // Tutup panel daftar sekolah dan jumlah sekolah saat klik
+  document.getElementById('jumlahSekolah').style.display = 'none';
+  document.getElementById('tabelSekolah').style.display = 'none';
+
+  // Jika ada infoWindow yang sedang terbuka, tutup dulu
+  if (currentInfoWindow) {
+    currentInfoWindow.close();
+  }
+
+  // Buat InfoWindow dan buka
+  currentInfoWindow = new google.maps.InfoWindow({
+    content: createInfoWindowContent(lat, lng, props),
+    position: { lat, lng }
+  });
+
+  currentInfoWindow.open(map);
+}
+
+
 
     document.getElementById("searchBox").addEventListener("input", e => {
       const keyword = e.target.value.toLowerCase();
@@ -481,26 +523,44 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
       }
     }
 
-   function renderTabelSekolah(sekolahArray) {
+   function formatRupiahSingkat(nilai) {
+  if (nilai >= 1000000) {
+    return `Rp ${(nilai / 1000000).toFixed(1)}jt`;
+  } else if (nilai >= 1000) {
+    return `Rp ${(nilai / 1000).toFixed(0)}rb`;
+  } else {
+    return `Rp ${nilai}`;
+  }
+}
+
+function renderTabelSekolah(sekolahArray) {
   const tabelDiv = document.getElementById("tabelSekolah");
   const tbody = tabelDiv.querySelector("tbody");
   const thead = tabelDiv.querySelector("thead");
 
-  // Atur ulang header tabel
+
   thead.innerHTML = `
     <tr>
-      <th>Nama Sekolah</th>
-      <th>Alamat</th>
+      <th>Nama</th>
       <th>Desa</th>
-      <th>Kecamatan</th>
-      <th>Jumlah Guru</th>
-      <th>Jumlah Siswa</th>
-      <th>Biaya Operasional</th>
-      <th>Total Biaya Operasional</th>
+      <th>Kec</th>
+      <th>Guru</th>
+      <th>Siswa</th>
+      <th>Biaya</th>
+      <th>Total</th>
+    </tr>
+    <tr>
+      <th>1</th>
+      <th>2</th>
+      <th>3</th>
+      <th>4</th>
+      <th>5</th>
+      <th>6</th>
+      <th>7</th>
+
     </tr>
   `;
 
-  // Bersihkan isi sebelumnya
   tbody.innerHTML = "";
 
   const biayaPerSiswa = 1500000; // biaya operasional per siswa tetap
@@ -512,13 +572,12 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${f.properties.nama_sekolah}</td>
-      <td>${f.properties.alamat_lengkap}</td>
-      <td>${f.properties.desa || '-'}</td>
+       <td>${f.properties.desa || '-'}</td>
       <td>${f.properties.kecamatan || '-'}</td>
       <td>${f.properties.jumlah_guru}</td>
       <td>${siswa}</td>
-      <td>Rp ${biayaPerSiswa.toLocaleString("id-ID")}</td>
-      <td>Rp ${totalBiaya.toLocaleString("id-ID")}</td>
+      <td>${formatRupiahSingkat(biayaPerSiswa)}</td>
+      <td>${formatRupiahSingkat(totalBiaya)}</td>
     `;
     tbody.appendChild(tr);
   });
