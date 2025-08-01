@@ -3,13 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Web GIS SMK Lampung (Google Maps)</title>
+  <title>Web GIS SMK Lampung</title>
 
-  
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBzmvxD2iXxm-VCOO_xUQgsmufRyWBElPo&libraries=geometry&callback=initMap" async defer></script>
 
-  
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBzmvxD2iXxm-VCOO_xUQgsmufRyWBElPo&libraries=geometry&callback=initMap" async defer></script>
 
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
@@ -57,14 +55,15 @@
       background: #eee;
     }
     #jumlahSekolah {
-      background: #007cbf;
-      color: white;
-      padding: 10px;
+      background: white;
+      color: #333;
+      padding: 15px;
       border-radius: 4px;
-      text-align: center;
-      font-weight: bold;
+      text-align: left;
+      font-weight: normal;
       display: none;
       margin-top: 10px;
+      border: 1px solid #ccc;
     }
     .bottom-panel {
       position: absolute;
@@ -106,6 +105,41 @@
       margin-bottom: 10px;
       cursor: pointer;
     }
+    #streetViewPanel {
+        height: 50%;
+        width: 100%;
+        position: absolute;
+        bottom: 0;
+        z-index: 1000;
+        display: none;
+    }
+     #tabelSekolah {
+      position:absolute;
+      top:10px;
+      right:10px;
+      width:500px;
+      max-height:80%;
+      overflow:auto;
+      background:white;
+      padding:15px;
+      border-radius:8px;
+      box-shadow:0 0 10px rgba(0,0,0,0.1);
+      z-index:999;
+      display:none;
+    }
+    #sekolahTable {
+      width:100%;
+      border-collapse:collapse;
+      font-size:12px;
+    }
+    #sekolahTable th, #sekolahTable td {
+        padding: 6px;
+        text-align: left;
+    }
+    #sekolahTable thead tr {
+        background:#007cbf;
+        color:white;
+    }
   </style>
 </head>
 <body>
@@ -136,23 +170,14 @@
 </div>
 
 <div id="map"></div>
- <div id="tabelSekolah" style="position:absolute; top:10px; right:10px; width:400px; max-height:80%; overflow:auto; background:white; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); z-index:999; display:none;">
-  <h3>Daftar Sekolah</h3>
-  <table id="sekolahTable" border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:14px;">
-    <thead>
-      <tr style="background:#007cbf; color:white;">
-        <th>Nama</th>
-        <th>Alamat</th>
-        <th>Desa</th>
-        <th>Kecamatan</th>
-        <th>Guru</th>
-        <th>Siswa</th>
-        <th>Biaya/Siswa</th>
-        <th>Total Biaya Tahunan</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<div id="streetViewPanel"></div>
+
+<div id="tabelSekolah">
+ <h3>Daftar Sekolah SMK</h3>
+ <table id="sekolahTable" border="1" cellpadding="5" cellspacing="0">
+   <thead></thead>
+   <tbody></tbody>
+ </table>
 </div>
 
 <div class="bottom-panel">
@@ -168,6 +193,8 @@ let markers = [];
 let prediksiMarkers = [];
 let userMarker = null;
 let garisPolylines = [];
+let panorama = null;
+let currentInfoWindow = null;
 
 function initMap() {
   map = new google.maps.Map(document.getElementById("map"), {
@@ -176,14 +203,12 @@ function initMap() {
     mapTypeId: "satellite"
   });
 
-  // Tampilkan batas kabupaten (GeoJSON)
   map.data.loadGeoJson('/kablam.geojson');
   map.data.setStyle({
     strokeColor: '#ff0000',
     strokeWeight: 2
   });
 
-  // Load GeoJSON sekolah
   fetch('/geojson/sekolahsmk')
     .then(res => res.json())
     .then(data => {
@@ -214,23 +239,17 @@ function loadSekolahMarkers(features) {
       map,
       title: props.nama_sekolah,
       icon: {
-        url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+        url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
       }
     });
 
-    const infoWindow = new google.maps.InfoWindow({
-      content: createInfoWindowContent(lat, lng, props)
-    });
-
     marker.addListener("click", () => {
-      infoWindow.open(map, marker);
+      flyToSekolah(lat, lng, props);
     });
 
     markers.push(marker);
   });
 }
-
-
 
 function createInfoWindowContent(lat, lng, props) {
   const biayaPerSiswa = 2000000;
@@ -238,24 +257,44 @@ function createInfoWindowContent(lat, lng, props) {
   const totalBiaya = biayaPerSiswa * jumlahSiswa;
 
   return `
-    <strong style="font-size:16px; color:#007cbf;">${props.nama_sekolah}</strong><br>
-    Desa: ${props.desa}<br>
-    Kecamatan: ${props.kecamatan}<br>
-    Alamat: ${props.alamat_lengkap}<br>
-    Jumlah guru: ${props.jumlah_guru}<br>
-    Jumlah siswa: ${props.jumlah_siswa}<br>
-    Biaya operasional per siswa: <strong>Rp ${biayaPerSiswa.toLocaleString('id-ID')}</strong><br>
-    Total biaya operasional sekolah/tahun: <strong>Rp ${totalBiaya.toLocaleString('id-ID')}</strong><br>
-    <img src="${props.Foto_Lokal}" width="200" style="margin-top:8px;"><br>
-    <button onclick="openStreetView(${lat}, ${lng})" style="margin-top:10px; padding:6px 12px; background:#007cbf; color:white; border:none; border-radius:4px; cursor:pointer;">
-      Lihat Street View
-    </button>
-    <button onclick="openGoogleMaps('${props.Url_Google_maps}')" style="margin-top:10px; margin-left:5px; padding:6px 12px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">
-      Lihat Detail Sekolah
-    </button>
+    <div style="font-family: Arial, sans-serif; font-size: 13px; max-width: 260px;">
+      <div style="font-weight: bold; color: #007cbf; margin-bottom: 5px;">
+        ${props.nama_sekolah}
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        <strong>Alamat:</strong><br>
+        ${props.alamat_lengkap || props.desa || 'Data tidak tersedia'}
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        👨‍🏫 <strong>Guru:</strong> ${props.jumlah_guru || 'N/A'} <br>
+        👨‍🎓 <strong>Siswa:</strong> ${props.jumlah_siswa || 'N/A'}
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        💰 <strong>Biaya perSiswa:</strong> Rp ${biayaPerSiswa.toLocaleString('id-ID')}<br>
+        💸 <strong>Total Oprasional perTahun:</strong> Rp ${totalBiaya.toLocaleString('id-ID')}
+      </div>
+
+      <img src="${props.Foto_Lokal}" alt="Foto Sekolah"
+        style="width: 100%; height: 80px; object-fit: cover; border-radius: 4px; margin-bottom: 6px;"
+        onerror="this.style.display='none'" />
+
+      <div style="display: flex; gap: 6px;">
+        <button onclick="openStreetView(${lat}, ${lng})"
+          style="flex:1; background:#007cbf; color:white; border:none; padding:6px; font-size:12px; border-radius:4px; cursor:pointer;">
+          Street View
+        </button>
+
+        <button onclick="openGoogleMaps('${props.Url_Maps}')"
+          style="flex:1; background:#28a745; color:white; border:none; padding:6px; font-size:12px; border-radius:4px; cursor:pointer;">
+          Detail
+        </button>
+      </div>
+    </div>
   `;
 }
-
 
 document.getElementById("kabupatenSelect").addEventListener("change", e => {
   const selectedKab = e.target.value;
@@ -264,12 +303,20 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
   if (selectedKab === "") {
     loadSekolahMarkers(sekolahData.features);
     jumlahDiv.style.display = "none";
-    document.getElementById("tabelSekolah").style.display = "none"; // sembunyikan tabel jika semua kabupaten
+    document.getElementById("tabelSekolah").style.display = "none";
   } else {
     const filtered = sekolahData.features.filter(f => f.properties.kabupaten === selectedKab);
     loadSekolahMarkers(filtered);
 
-    let html = `<strong>${filtered.length}</strong> sekolah SMK di <strong>${selectedKab}</strong><br><br>`;
+    let html = `
+      <div style="text-align:right;">
+        <button onclick="document.getElementById('jumlahSekolah').style.display='none'; document.getElementById('tabelSekolah').style.display='none';"
+          style="background:#e74c3c; color:#fff; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">
+          Close
+        </button>
+      </div>
+      <strong>${filtered.length}</strong> sekolah SMK di <strong>${selectedKab}</strong><br><br>`;
+
     if (filtered.length > 0) {
       html += `<div style="max-height:200px; overflow-y:auto;">`;
       filtered.forEach(f => {
@@ -279,30 +326,34 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
         </div>`;
       });
       html += `</div>`;
-      
-      // Tampilkan tabel sekolah juga
-      renderTabelSekolah(filtered);
     } else {
       html += "Tidak ada sekolah ditemukan.";
-      document.getElementById("tabelSekolah").style.display = "none"; // sembunyikan tabel kalau kosong
     }
 
     jumlahDiv.innerHTML = html;
     jumlahDiv.style.display = "block";
+
+    renderTabelSekolah(filtered);
   }
 });
-
 
 function flyToSekolah(lat, lng, props) {
   map.setCenter({ lat, lng });
   map.setZoom(15);
 
-  const infoWindow = new google.maps.InfoWindow({
+  document.getElementById('jumlahSekolah').style.display = 'none';
+  document.getElementById('tabelSekolah').style.display = 'none';
+
+  if (currentInfoWindow) {
+    currentInfoWindow.close();
+  }
+
+  currentInfoWindow = new google.maps.InfoWindow({
     content: createInfoWindowContent(lat, lng, props),
     position: { lat, lng }
   });
 
-  infoWindow.open(map);
+  currentInfoWindow.open(map);
 }
 
 document.getElementById("searchBox").addEventListener("input", e => {
@@ -360,7 +411,7 @@ document.getElementById("lokasiSayaBtn").addEventListener("click", () => {
     userMarker = new google.maps.Marker({
       position: { lat, lng },
       map,
-      icon: { url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png" }
+      icon: { url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }
     });
 
     map.setCenter({ lat, lng });
@@ -404,25 +455,6 @@ document.getElementById("lokasiSayaBtn").addEventListener("click", () => {
           map
         });
         garisPolylines.push(line);
-
-        const marker = new google.maps.Marker({
-          position: s.coords,
-          map,
-          title: s.nama,
-          icon: {
-            url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-          }
-        });
-
-        const infoWindow = new google.maps.InfoWindow({
-          content: createInfoWindowContent(s.coords.lat, s.coords.lng, s.properties)
-        });
-
-        marker.addListener("click", () => {
-          infoWindow.open(map, marker);
-        });
-
-        prediksiMarkers.push(marker);
       });
     }
 
@@ -437,27 +469,88 @@ document.getElementById("lokasiSayaBtn").addEventListener("click", () => {
 
 function hidePrediksi() {
   document.getElementById("hasilPrediksi").style.display = "none";
+  if (userMarker) userMarker.setMap(null);
   garisPolylines.forEach(line => line.setMap(null));
-  prediksiMarkers.forEach(m => m.setMap(null));
 }
 
 function openStreetView(lat, lng) {
-  window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`, '_blank');
+    const streetViewDiv = document.getElementById("streetViewPanel");
+    streetViewDiv.style.display = "block";
+    
+    // Add a close button to the panel
+    streetViewDiv.innerHTML = `<button onclick="closeStreetView()" style="position:absolute;top:5px;right:5px;z-index:1;background:red;color:white;border:none;padding:5px 10px;cursor:pointer;">X</button>`;
+    
+    // Ensure the panorama object is created inside the main div
+    const panoramaDiv = document.createElement('div');
+    panoramaDiv.style.width = "100%";
+    panoramaDiv.style.height = "100%";
+    streetViewDiv.appendChild(panoramaDiv);
+
+    panorama = new google.maps.StreetViewPanorama(panoramaDiv, {
+        position: { lat, lng },
+        pov: { heading: 34, pitch: 10 },
+        zoom: 1,
+        addressControl: false,
+        linksControl: true,
+        panControl: true,
+        enableCloseButton: false // We use our own close button
+    });
+    map.setStreetView(panorama);
+}
+
+function closeStreetView() {
+    if (panorama) {
+        panorama.setVisible(false);
+    }
+    document.getElementById("streetViewPanel").style.display = "none";
+    document.getElementById("streetViewPanel").innerHTML = ""; // Clear content
 }
 
 function openGoogleMaps(url) {
-  if (url && url.trim() !== "") {
+  if (url && url.trim() !== "" && url.startsWith("http")) {
     window.open(url, '_blank');
   } else {
     alert("Link Google Maps tidak tersedia untuk sekolah ini.");
   }
 }
+
+function formatRupiahSingkat(nilai) {
+    if (nilai >= 1000000000) {
+        return `Rp ${(nilai / 1000000000).toFixed(1)} M`;
+    }
+    if (nilai >= 1000000) {
+        return `Rp ${(nilai / 1000000).toFixed(1)} jt`;
+    }
+    if (nilai >= 1000) {
+        return `Rp ${(nilai / 1000).toFixed(0)} rb`;
+    }
+    return `Rp ${nilai}`;
+}
+
 function renderTabelSekolah(sekolahArray) {
   const tabelDiv = document.getElementById("tabelSekolah");
   const tbody = tabelDiv.querySelector("tbody");
-  tbody.innerHTML = "";
+  const thead = tabelDiv.querySelector("thead");
 
-  const biayaPerSiswa = 2000000; // Sesuaikan dengan biaya SMK
+  thead.innerHTML = `
+    <tr>
+      <th>Nama</th>
+      <th>Desa</th>
+      <th>Kec</th>
+      <th>Guru</th>
+      <th>Siswa</th>
+      <th>Biaya</th>
+      <th>Total</th>
+    </tr>
+  `;
+
+  tbody.innerHTML = "";
+  const biayaPerSiswa = 2000000;
+
+  if (sekolahArray.length === 0) {
+      tabelDiv.style.display = "none";
+      return;
+  }
 
   sekolahArray.forEach(f => {
     const siswa = parseInt(f.properties.jumlah_siswa) || 0;
@@ -466,13 +559,12 @@ function renderTabelSekolah(sekolahArray) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${f.properties.nama_sekolah}</td>
-      <td>${f.properties.alamat_lengkap}</td>
       <td>${f.properties.desa || '-'}</td>
       <td>${f.properties.kecamatan || '-'}</td>
-      <td>${f.properties.jumlah_guru}</td>
+      <td>${f.properties.jumlah_guru || 0}</td>
       <td>${siswa}</td>
-      <td>Rp ${biayaPerSiswa.toLocaleString("id-ID")}</td>
-      <td>Rp ${totalBiaya.toLocaleString("id-ID")}</td>
+      <td>${formatRupiahSingkat(biayaPerSiswa)}</td>
+      <td>${formatRupiahSingkat(totalBiaya)}</td>
     `;
     tbody.appendChild(tr);
   });
