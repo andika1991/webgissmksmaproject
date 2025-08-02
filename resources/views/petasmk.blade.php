@@ -6,21 +6,26 @@
   <title>Web GIS SMK Lampung</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBzmvxD2iXxm-VCOO_xUQgsmufRyWBElPo&libraries=geometry&callback=initMap" async defer></script>
-
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
+    /* General Styles */
     html, body {
       height: 100%;
       margin: 0;
+      padding: 0;
       font-family: 'Roboto', sans-serif;
     }
     #map {
       height: 100%;
       width: 100%;
     }
+    button {
+        cursor: pointer;
+    }
+
+    /* Top-Left Controls */
     .controls {
       position: absolute;
       top: 10px;
@@ -30,10 +35,12 @@
       border-radius: 8px;
       z-index: 999;
       width: 300px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
     .controls select,
     .controls input {
       width: 100%;
+      box-sizing: border-box; /* Ensures padding doesn't affect width */
       margin-bottom: 10px;
       padding: 8px;
       border: 1px solid #ccc;
@@ -65,6 +72,52 @@
       margin-top: 10px;
       border: 1px solid #ccc;
     }
+
+    /* Top-Right Table Panel */
+    #tabelSekolah {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 500px;
+      max-height: 80%;
+      overflow: auto;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 999;
+      display: none;
+    }
+    #tabelSekolah h3 {
+        margin-top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    #tabelSekolah .close-btn-table {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 4px 10px;
+        font-size: 12px;
+        border-radius: 3px;
+    }
+    #sekolahTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    #sekolahTable th, #sekolahTable td {
+      padding: 6px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    #sekolahTable thead tr {
+      background: #007cbf;
+      color: white;
+    }
+
+    /* Bottom Panel */
     .bottom-panel {
       position: absolute;
       bottom: 0;
@@ -76,6 +129,7 @@
       display: flex;
       justify-content: space-between;
       flex-wrap: wrap;
+      box-sizing: border-box;
     }
     .bottom-panel button {
       background: #007cbf;
@@ -83,7 +137,6 @@
       border: none;
       padding: 10px 15px;
       border-radius: 4px;
-      cursor: pointer;
       font-size: 14px;
     }
     #hasilPrediksi {
@@ -103,42 +156,71 @@
       font-size: 12px;
       border-radius: 3px;
       margin-bottom: 10px;
-      cursor: pointer;
     }
+
+    /* StreetView Panel */
     #streetViewPanel {
-        height: 50%;
-        width: 100%;
-        position: absolute;
-        bottom: 0;
-        z-index: 1000;
+      height: 50%;
+      width: 100%;
+      position: absolute;
+      bottom: 0;
+      z-index: 1000;
+      display: none;
+    }
+
+    /* =========================================== */
+    /* == RESPONSIVE STYLES FOR MOBILE/TABLET ==== */
+    /* =========================================== */
+    @media (max-width: 768px) {
+      /* Make controls full width on small screens */
+      .controls {
+        width: auto;
+        left: 10px;
+        right: 10px;
+      }
+      
+      /* Position the table below controls, full width */
+      #tabelSekolah {
+        width: auto;
+        left: 10px;
+        right: 10px;
+        top: 10px; /* Position it at the top */
+        max-height: 75%; /* Allow it to take more vertical space */
+      }
+
+      /* Responsive Table Transformation */
+      #sekolahTable thead {
+        /* Hide the table header, as we will use data-labels */
         display: none;
-    }
-     #tabelSekolah {
-      position:absolute;
-      top:10px;
-      right:10px;
-      width:500px;
-      max-height:80%;
-      overflow:auto;
-      background:white;
-      padding:15px;
-      border-radius:8px;
-      box-shadow:0 0 10px rgba(0,0,0,0.1);
-      z-index:999;
-      display:none;
-    }
-    #sekolahTable {
-      width:100%;
-      border-collapse:collapse;
-      font-size:12px;
-    }
-    #sekolahTable th, #sekolahTable td {
-        padding: 6px;
+      }
+      #sekolahTable, #sekolahTable tbody, #sekolahTable tr, #sekolahTable td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #sekolahTable tr {
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 5px;
+      }
+      #sekolahTable td {
+        text-align: right; /* Align content to the right */
+        padding-left: 50%; /* Make space for the label */
+        position: relative;
+        border-bottom: none; /* Remove bottom border from cells */
+      }
+      #sekolahTable td::before {
+        /* Use the data-label attribute as the cell's label */
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        width: 45%;
+        padding-right: 10px;
         text-align: left;
-    }
-    #sekolahTable thead tr {
-        background:#007cbf;
-        color:white;
+        font-weight: bold;
+        color: #333;
+      }
     }
   </style>
 </head>
@@ -173,8 +255,11 @@
 <div id="streetViewPanel"></div>
 
 <div id="tabelSekolah">
- <h3>Daftar Sekolah SMK</h3>
- <table id="sekolahTable" border="1" cellpadding="5" cellspacing="0">
+ <h3>
+    Daftar Sekolah SMK
+    <button class="close-btn-table" onclick="document.getElementById('tabelSekolah').style.display='none'">Tutup</button>
+ </h3>
+ <table id="sekolahTable">
    <thead></thead>
    <tbody></tbody>
  </table>
@@ -283,12 +368,12 @@ function createInfoWindowContent(lat, lng, props) {
 
       <div style="display: flex; gap: 6px;">
         <button onclick="openStreetView(${lat}, ${lng})"
-          style="flex:1; background:#007cbf; color:white; border:none; padding:6px; font-size:12px; border-radius:4px; cursor:pointer;">
+          style="flex:1; background:#007cbf; color:white; border:none; padding:6px; font-size:12px; border-radius:4px;">
           Street View
         </button>
 
         <button onclick="openGoogleMaps('${props.Url_Maps}')"
-          style="flex:1; background:#28a745; color:white; border:none; padding:6px; font-size:12px; border-radius:4px; cursor:pointer;">
+          style="flex:1; background:#28a745; color:white; border:none; padding:6px; font-size:12px; border-radius:4px;">
           Detail
         </button>
       </div>
@@ -308,9 +393,10 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
     const filtered = sekolahData.features.filter(f => f.properties.kabupaten === selectedKab);
     loadSekolahMarkers(filtered);
 
+    // This div only shows the count and list now. The table is separate.
     let html = `
       <div style="text-align:right;">
-        <button onclick="document.getElementById('jumlahSekolah').style.display='none'; document.getElementById('tabelSekolah').style.display='none';"
+        <button onclick="document.getElementById('jumlahSekolah').style.display='none';"
           style="background:#e74c3c; color:#fff; border:none; padding:5px 10px; cursor:pointer; border-radius:3px;">
           Close
         </button>
@@ -333,6 +419,7 @@ document.getElementById("kabupatenSelect").addEventListener("change", e => {
     jumlahDiv.innerHTML = html;
     jumlahDiv.style.display = "block";
 
+    // Call the function to render the separate table
     renderTabelSekolah(filtered);
   }
 });
@@ -342,7 +429,8 @@ function flyToSekolah(lat, lng, props) {
   map.setZoom(15);
 
   document.getElementById('jumlahSekolah').style.display = 'none';
-  document.getElementById('tabelSekolah').style.display = 'none';
+  // Do not hide the table when flying to a school, let the user close it manually
+  // document.getElementById('tabelSekolah').style.display = 'none';
 
   if (currentInfoWindow) {
     currentInfoWindow.close();
@@ -477,10 +565,8 @@ function openStreetView(lat, lng) {
     const streetViewDiv = document.getElementById("streetViewPanel");
     streetViewDiv.style.display = "block";
     
-    // Add a close button to the panel
-    streetViewDiv.innerHTML = `<button onclick="closeStreetView()" style="position:absolute;top:5px;right:5px;z-index:1;background:red;color:white;border:none;padding:5px 10px;cursor:pointer;">X</button>`;
+    streetViewDiv.innerHTML = `<button onclick="closeStreetView()" style="position:absolute;top:5px;right:5px;z-index:1;background:red;color:white;border:none;padding:5px 10px;">X</button>`;
     
-    // Ensure the panorama object is created inside the main div
     const panoramaDiv = document.createElement('div');
     panoramaDiv.style.width = "100%";
     panoramaDiv.style.height = "100%";
@@ -493,7 +579,7 @@ function openStreetView(lat, lng) {
         addressControl: false,
         linksControl: true,
         panControl: true,
-        enableCloseButton: false // We use our own close button
+        enableCloseButton: false
     });
     map.setStreetView(panorama);
 }
@@ -503,7 +589,7 @@ function closeStreetView() {
         panorama.setVisible(false);
     }
     document.getElementById("streetViewPanel").style.display = "none";
-    document.getElementById("streetViewPanel").innerHTML = ""; // Clear content
+    document.getElementById("streetViewPanel").innerHTML = "";
 }
 
 function openGoogleMaps(url) {
@@ -527,6 +613,9 @@ function formatRupiahSingkat(nilai) {
     return `Rp ${nilai}`;
 }
 
+// ===================================
+// == MODIFIED JAVASCRIPT FUNCTION  ==
+// ===================================
 function renderTabelSekolah(sekolahArray) {
   const tabelDiv = document.getElementById("tabelSekolah");
   const tbody = tabelDiv.querySelector("tbody");
@@ -557,14 +646,17 @@ function renderTabelSekolah(sekolahArray) {
     const totalBiaya = biayaPerSiswa * siswa;
 
     const tr = document.createElement("tr");
+    
+    // *** KEY CHANGE HERE: Added data-label attribute to each <td> ***
+    // This attribute is used by the CSS for the mobile view.
     tr.innerHTML = `
-      <td>${f.properties.nama_sekolah}</td>
-      <td>${f.properties.desa || '-'}</td>
-      <td>${f.properties.kecamatan || '-'}</td>
-      <td>${f.properties.jumlah_guru || 0}</td>
-      <td>${siswa}</td>
-      <td>${formatRupiahSingkat(biayaPerSiswa)}</td>
-      <td>${formatRupiahSingkat(totalBiaya)}</td>
+      <td data-label="Nama">${f.properties.nama_sekolah}</td>
+      <td data-label="Desa">${f.properties.desa || '-'}</td>
+      <td data-label="Kec.">${f.properties.kecamatan || '-'}</td>
+      <td data-label="Guru">${f.properties.jumlah_guru || 0}</td>
+      <td data-label="Siswa">${siswa}</td>
+      <td data-label="Biaya/Siswa">${formatRupiahSingkat(biayaPerSiswa)}</td>
+      <td data-label="Total/Tahun">${formatRupiahSingkat(totalBiaya)}</td>
     `;
     tbody.appendChild(tr);
   });
